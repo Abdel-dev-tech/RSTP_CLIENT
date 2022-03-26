@@ -17,6 +17,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.StringTokenizer;
 
 /**
  * This class represents a connection with an RTSP server.
@@ -29,6 +30,7 @@ public class RTSPConnection {
     private Socket  RTSPsocket;
     private InetAddress ServerIPAddr;
     private int RTSPSeqNb;
+    String rtspSessionId;
     static BufferedReader RTSPBufferedReader;
     static BufferedWriter RTSPBufferedWriter;
     static int state;
@@ -50,6 +52,7 @@ public class RTSPConnection {
     public RTSPConnection(Session session, String server, int port) throws RTSPException {
 
         this.session = session;
+        this.state=0;
         try{
             ServerIPAddr = InetAddress.getByName(server);
             RTSPsocket   = new Socket(ServerIPAddr, port);
@@ -87,17 +90,73 @@ public class RTSPConnection {
 
         // TODO
         System.out.println("Setup Button pressed !");
-
+        int rtspResponseCode;
         this.RTSPSeqNb = 1;
         try {
             RTSPBufferedWriter.write( "SETUP " + videoName + " RTSP/1.0\r\n");
             RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
             RTSPBufferedWriter.write("Transport: RTP/UDP;client_port=" + this.RTP_PORT + "\r\n\r\n");
-
+            RTSPBufferedWriter.flush();
            /* RTSPBufferedWriter.write( "SETUP movie.Mjpeg RTSP/1.0\r\n");
             RTSPBufferedWriter.write( "CSeq: 63\r\n");
             RTSPBufferedWriter.write( "Transport: RTP/UDP;client_port=8000\r\n\r\n");*/
-            RTSPBufferedWriter.flush();
+
+
+           /* StringTokenizer var3 = new StringTokenizer(var2);
+            var3.nextToken();
+            var1 = Integer.parseInt(var3.nextToken());
+            if (var1 == 200) {
+                String var4 = RTSPBufferedReader.readLine();
+                System.out.println(var4);
+                String var5 = RTSPBufferedReader.readLine();
+                System.out.println(var5);
+                var3 = new StringTokenizer(var5);
+                String var6 = var3.nextToken();
+                if (state == 0 && var6.compareTo("Session:") == 0) {
+                    this.RTSPid = var3.nextToken();
+                } else if (var6.compareTo("Content-Base:") == 0) {
+                    for(int var8 = 0; var8 < 6; ++var8) {
+                        String var7 = RTSPBufferedReader.readLine();
+                        System.out.println(var7);
+                    }
+                }
+            }*/
+
+
+            /*Get the server response*/
+            String serverResponse = RTSPBufferedReader.readLine();
+            /*Print teh server response into the terminal*/
+            System.out.println("RTSP Client - Received from Server:");
+            System.out.println(serverResponse);
+            /*break the server response into tokens, to be able to check the response code*/
+            StringTokenizer serverResponseTokens = new StringTokenizer(serverResponse);
+            serverResponseTokens.nextToken();
+            rtspResponseCode =Integer.parseInt(serverResponseTokens.nextToken());
+            if(rtspResponseCode==200)
+            {
+                String SCeqNumber = RTSPBufferedReader.readLine();
+                System.out.println(SCeqNumber);
+
+                String SessionID = RTSPBufferedReader.readLine();
+                System.out.println(SessionID);
+
+                /*break the server response into tokens, to be able to retrieve session ID*/
+                serverResponseTokens = new StringTokenizer(SessionID);
+                String secondLineResponse = serverResponseTokens.nextToken();
+
+                if (this.state == 0 && secondLineResponse.compareTo("Session:") == 0) {
+                    this.rtspSessionId = serverResponseTokens.nextToken();
+                    System.out.println("The session ID is :"+this.rtspSessionId);
+                } else if (secondLineResponse.compareTo("Content-Base:") == 0) {
+                    System.out.println("Response contains Content-base field");
+
+                }
+
+
+
+
+            }
+
         } catch (Exception var3) {
             System.out.println("Exception caught: " + var3);
             System.exit(0);
