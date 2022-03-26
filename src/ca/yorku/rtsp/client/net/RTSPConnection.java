@@ -13,6 +13,10 @@ import ca.yorku.rtsp.client.model.Session;
 
 import java.io.IOException;
 import java.net.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 
 /**
  * This class represents a connection with an RTSP server.
@@ -22,6 +26,15 @@ public class RTSPConnection {
     private static final int BUFFER_LENGTH = 0x10000;
 
     private Session session;
+    private Socket  RTSPsocket;
+    private InetAddress ServerIPAddr;
+    private int RTSPSeqNb;
+    static BufferedReader RTSPBufferedReader;
+    static BufferedWriter RTSPBufferedWriter;
+    static int state;
+    static int RTP_PORT=8000;
+
+
 
     // TODO Add additional fields, if necessary
 
@@ -37,12 +50,11 @@ public class RTSPConnection {
     public RTSPConnection(Session session, String server, int port) throws RTSPException {
 
         this.session = session;
-       /* Client var1 = new Client();
-        int var2 = Integer.parseInt(port);
-        String var3 = var0[0];*/
         try{
-            InetAddress ServerIPAddr = InetAddress.getByName(server);
-            Socket RTPsocket = new Socket(ServerIPAddr, port);
+            ServerIPAddr = InetAddress.getByName(server);
+            RTSPsocket   = new Socket(ServerIPAddr, port);
+            RTSPBufferedReader = new BufferedReader(new InputStreamReader(this.RTSPsocket.getInputStream()));
+            RTSPBufferedWriter = new BufferedWriter(new OutputStreamWriter(this.RTSPsocket.getOutputStream()));
         }
         catch (UnknownHostException e){
 
@@ -74,6 +86,31 @@ public class RTSPConnection {
     public synchronized void setup(String videoName) throws RTSPException {
 
         // TODO
+        System.out.println("Setup Button pressed !");
+
+        this.RTSPSeqNb = 1;
+        try {
+            RTSPBufferedWriter.write( "SETUP " + videoName + " RTSP/1.0\r\n");
+            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
+            RTSPBufferedWriter.write("Transport: RTP/UDP;client_port=" + this.RTP_PORT + "\r\n\r\n");
+
+           /* RTSPBufferedWriter.write( "SETUP movie.Mjpeg RTSP/1.0\r\n");
+            RTSPBufferedWriter.write( "CSeq: 63\r\n");
+            RTSPBufferedWriter.write( "Transport: RTP/UDP;client_port=8000\r\n\r\n");*/
+            RTSPBufferedWriter.flush();
+        } catch (Exception var3) {
+            System.out.println("Exception caught: " + var3);
+            System.exit(0);
+        }
+
+        /*
+        if (Client.this.parseServerResponse() != 200) {
+            System.out.println("Invalid Server Response");
+        } else {
+            Client.state = 1;
+            System.out.println("New RTSP state: READY");
+        }*/
+
     }
 
     /**
