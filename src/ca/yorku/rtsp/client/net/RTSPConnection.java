@@ -6,12 +6,9 @@
  */
 
 package ca.yorku.rtsp.client.net;
-
 import ca.yorku.rtsp.client.exception.RTSPException;
 import ca.yorku.rtsp.client.model.Frame;
 import ca.yorku.rtsp.client.model.Session;
-import java.awt.Toolkit;
-import java.util.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.*;
@@ -20,7 +17,6 @@ import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.StringTokenizer;
-import javax.swing.Timer;
 /**
  * This class represents a connection with an RTSP server.
  */
@@ -34,18 +30,15 @@ public class RTSPConnection {
     public DatagramPacket RTPPacket;
     private InetAddress ServerIPAddr;
     private int RTSPSeqNb;
-    String rtspSessionId;
-    static BufferedReader RTSPBufferedReader;
-    static BufferedWriter RTSPBufferedWriter;
-    static int state;
-    static int RTP_PORT = 8000;
+    public String rtspSessionId;
+    public static BufferedReader RTSPBufferedReader;
+    public static BufferedWriter RTSPBufferedWriter;
+    public static int state;
+    public static int RTP_PORT = 8000;
     private String videoName;
     double statStartTime;
-    private Timer timer;
-    RTPReceivingThread rtpRceivedataThread;
-    byte[] rtpBuffer;
-    int payload_size;
-    public byte[] payload;
+    public RTPReceivingThread rtpRceivedataThread;
+    public byte[] rtpBuffer;
 
     // TODO Add additional fields, if necessary
 
@@ -60,11 +53,13 @@ public class RTSPConnection {
      */
     public RTSPConnection(Session session, String server, int port) throws RTSPException {
         this.session = session;
-        state = 0;
+        /*Initialize the RTSP state machine*/
+        this.state = 0;
+        /*Allocate the rtpBuffer with 15000 bytes*/
         this.rtpBuffer = new byte[15000];
         System.out.println("RTSP state: INIT");
         try {
-
+            /*Connect the RTSP socket to the RTSP server IP address and port number*/
             ServerIPAddr = InetAddress.getByName(server);
             RTSPsocket = new Socket(ServerIPAddr, port);
             RTSPBufferedReader = new BufferedReader(new InputStreamReader(this.RTSPsocket.getInputStream()));
@@ -74,13 +69,6 @@ public class RTSPConnection {
         } catch (IOException b) {
 
         }
-      /*  VideoFileName = var0[2];
-        DatagramSocket RTPsocket;*/
-        //  Socket RTPsocket = new Socket(ServerIPAddr, port);
-       /* RTSPBufferedReader = new BufferedReader(new InputStreamReader(var1.RTSPsocket.getInputStream()));
-        RTSPBufferedWriter = new BufferedWriter(new OutputStreamWriter(var1.RTSPsocket.getOutputStream()));
-        state = 0;*/
-        // TODO
     }
 
     /**
@@ -104,44 +92,21 @@ public class RTSPConnection {
         this.RTSPSeqNb = 1;
 
         try {
-
-
-            /*Send SETUP request to the server*/
-           /* RTSPBufferedWriter.write("SETUP " + videoName + " RTSP/1.0\r\n");
-            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
-            RTSPBufferedWriter.write("Transport: RTP/UDP;client_port=" + RTP_PORT + "\r\n\r\n");
-            RTSPBufferedWriter.flush();*/
-
             this.sendRtspRequest("SETUP");
-
-            /*Get the server response*/
-            /*Get Play response*/
+            /*Get the server SETUP  response*/
             RTSPResponse response = readRTSPResponse();
-
             if (response.getResponseCode()==200) {
-
                 this.RTPsocket = new DatagramSocket(RTP_PORT);
                 this.RTPsocket.setSoTimeout(100);
-                state = 1;
+                this.state = 1;
                 this.rtspSessionId=response.getHeaderValue("Session:");
                 System.out.println("RTSP state: READY");
-
-                /*if (state == 0 && response..compareTo("Session:") == 0) {
-                    this.rtspSessionId = serverResponseTokens.nextToken();
-                    System.out.println("The session ID is :" + this.rtspSessionId);
-
-                } else if (secondLineResponse.compareTo("Content-Base:") == 0) {
-                    System.out.println("Response contains Content-base field");
-
-                }*/
-
             }
-
-        } catch (Exception exp) {
-            System.out.println("Exception caught: " + exp);
-            System.exit(0);
-        }
-
+            } catch (SocketException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
     }
 
     /**
@@ -153,21 +118,22 @@ public class RTSPConnection {
      *                       successful response.
      */
     public synchronized void play() throws RTSPException {
-
         System.out.println("Play Button pressed!");
         this.statStartTime = (double) System.currentTimeMillis();
         if (state == 1) {
             /*Update the sequence number*/
             ++this.RTSPSeqNb;
-             //this.sendPlayRequest();
              this.sendRtspRequest("PLAY");
             /*Get Play response*/
             RTSPResponse response = null;
             try {
                 response = readRTSPResponse();
-                if(response.getResponseCode()==200){
+                if(response.getResponseCode()==200)
+                {
                     state = 2;
                     System.out.println("RTSP state: PLAYING");
+
+                    /*Check if RTP thread is suspended or not started yet*/
                     if(rtpRceivedataThread.threadSuspended)
                     {
                         /*Resume the RTP thread after being paused by pause request*/
@@ -187,21 +153,8 @@ public class RTSPConnection {
                 e.printStackTrace();
             }
         }
-
     }
 
-   /* private void sendPlayRequest() {
-        try {
-            RTSPBufferedWriter.write("PLAY " + this.videoName + " RTSP/1.0\r\n");
-            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
-            RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
-            RTSPBufferedWriter.flush();
-
-        } catch (Exception exp) {
-            System.out.println("Exception caught: " + exp);
-            System.exit(0);
-        }
-    }*/
 
     private void sendRtspRequest(String request) {
         try {
@@ -227,7 +180,7 @@ public class RTSPConnection {
          * (using the parseRTPPacket method) and the method session.processReceivedFrame is called with the resulting
          * packet. The receiving process should be configured to timeout if no RTP packet is received after two seconds.
          */
-
+        /*The following attributes are added to let this thread controllable from rtspConnection thread*/
         public RTSPConnection rtspConnection;
         boolean threadSuspended;
         boolean threadStoped;
@@ -241,38 +194,38 @@ public class RTSPConnection {
             double elapsedTime=0.0, start=(double)System.currentTimeMillis();
             while (true) {
                 rtspConnection.RTPPacket = new DatagramPacket(rtspConnection.rtpBuffer, rtspConnection.rtpBuffer.length);
-
                 try {
-                    /* parsed into a Frame object */
+                    /* Compute the elapsed time from the last received packet */
                     elapsedTime=(double)System.currentTimeMillis()-start;
                     if(elapsedTime>2000)
                         break;
+                    /*In case of PAUSE request, the thread will be suspended here*/
                     if(rtpRceivedataThread.threadSuspended)
                         synchronized(rtpRceivedataThread) {
                             rtpRceivedataThread.wait();
                         }
+                    /*In case of TEARDOWN request, the thread will quit the loop, then finish*/
                     if(threadStoped)
                         break;
+                    /*Receive RTP packets*/
                     rtspConnection.RTPsocket.receive(rtspConnection.RTPPacket);
+                    /*Parse the RTP packet into a Frame*/
                     Frame frame = parseRTPPacket(rtspConnection.RTPPacket);
 
                     System.out.println("Packet Received");
-                    /* called with the resulting packet */
+                    /* Process the resulting frame */
                     session.processReceivedFrame(frame);
+                    /*Update the current time, that will be used to check if no packet is received more that 2 seconds*/
                     start=(double)System.currentTimeMillis();
-
                     } catch (InterruptedIOException exception) {
                         System.out.println("Nothing to read");
-
                     } catch (IOException e) {
                         System.out.println("Exception caught: " + e);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    // TODO
                 }
             System.out.println("************ End of THREAD ****************");
-            rtspConnection.RTPsocket.disconnect();
             rtspConnection.RTPsocket.close();
             }
         }
@@ -290,12 +243,10 @@ public class RTSPConnection {
             if(state==2) {
                 this.RTSPSeqNb++;
                 /*Send Pause request*/
-                //sendPauseRequest();
                 this.sendRtspRequest("PAUSE");
                 try {
                     /*Get Pause response*/
                     RTSPResponse response = readRTSPResponse();
-
                     if(response.getResponseCode()==200){
                         state = 1;
                         System.out.println("RTSP state: READY");
@@ -304,30 +255,12 @@ public class RTSPConnection {
                     else{
                         System.out.println("Invalid Server pause Response");
                     }
-
                 } catch (IOException e) {
                     e.printStackTrace();
-                }/*catch (InterruptedException e) {
-                    e.printStackTrace();
-                }*/
+                }
             }
         }
-   /* private int sendPauseRequest() {
 
-        int rtspResponseCode = 0;
-        try {
-            /* Create a socket that will be used for RTP receive traffic*/
-           /* RTSPBufferedWriter.write("PAUSE " + this.videoName + " RTSP/1.0\r\n");
-            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
-            RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
-            RTSPBufferedWriter.flush();
-
-        } catch (Exception exp) {
-            System.out.println("Exception caught: " + exp);
-            System.exit(0);
-        }
-        return rtspResponseCode;
-    }*/
         /**
          * Sends a TEARDOWN request to the server. This method is responsible for sending the request, receiving the
          * response and, in case of a successful response, closing the RTP socket. This method does not close the RTSP
@@ -339,20 +272,17 @@ public class RTSPConnection {
          *                       successful response.
          */
         public synchronized void teardown() throws RTSPException {
-
             System.out.println("Teardown Button pressed !");
             this.RTSPSeqNb++;
-            //sendTearDownRequest();
             this.sendRtspRequest("TEARDOWN");
-
             /*Get Pause response*/
             RTSPResponse response = null;
             try {
                 response = readRTSPResponse();
                 if(response.getResponseCode()==200){
-                    state = 0;
+                    this.state = 0;
                     System.out.println("RTSP state: INIT");
-
+                    /*Check if RTP Receiving thread was suspended*/
                     if(rtpRceivedataThread.threadSuspended) {
                         /*Resume the RTP thread after being paused by pause request*/
                         synchronized (rtpRceivedataThread) {
@@ -370,18 +300,6 @@ public class RTSPConnection {
             }
         }
 
-  /*  private void sendTearDownRequest() {
-        try {
-            /* Create a socket that will be used for RTP receive traffic*/
-           /* RTSPBufferedWriter.write("TEARDOWN " + this.videoName + " RTSP/1.0\r\n");
-            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
-            RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
-            RTSPBufferedWriter.flush();
-        } catch (Exception exp) {
-            System.out.println("Exception caught: " + exp);
-            System.exit(0);
-        }
-    }*/
         /**
          * Closes the connection with the RTSP server. This method should also close any open resource associated to this
          * connection, such as the RTP connection, if it is still open.
@@ -406,7 +324,6 @@ public class RTSPConnection {
             int payloadLength = packet.getLength();
             byte[] rtpBuffer = packet.getData();
             byte[] header = new byte[12];
-            byte[] payload;
             int version, TimeStamp;
             byte payloadType;
             short SequenceNumber;
@@ -433,7 +350,6 @@ public class RTSPConnection {
          * @throws RTSPException If the response doesn't match the expected format.
          */
         public RTSPResponse readRTSPResponse() throws IOException, RTSPException {
-//TODO
             RTSPResponse  rtspResponse;
             /*Get the server response*/
             String serverResponse;
@@ -465,4 +381,3 @@ public class RTSPConnection {
             return rtspResponse;
         }
     }
-

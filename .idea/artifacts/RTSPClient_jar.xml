@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="RTSPClient:jar">
+    <output-path>$PROJECT_DIR$/bin/artifacts/RTSPClient_jar</output-path>
+    <root id="archive" name="RTSPClient.jar">
+      <element id="module-output" name="RTSPClient" />
+    </root>
+  </artifact>
+</component>
