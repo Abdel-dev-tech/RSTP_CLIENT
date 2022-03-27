@@ -11,6 +11,7 @@ import ca.yorku.rtsp.client.exception.RTSPException;
 import ca.yorku.rtsp.client.model.Frame;
 import ca.yorku.rtsp.client.model.Session;
 import java.awt.Toolkit;
+import java.util.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.*;
@@ -172,7 +173,12 @@ public class RTSPConnection {
                 this.state = 2;
                 System.out.println("RTSP state: PLAYING");
                 if(rtpRceivedataThread.threadSuspended)
-                    rtpRceivedataThread.resume();
+                {
+                    synchronized(rtpRceivedataThread) {
+                        rtpRceivedataThread.notify();
+                    }
+                rtpRceivedataThread.threadSuspended=false;
+                }
                 else
                     rtpRceivedataThread.start();
             }
@@ -207,6 +213,9 @@ public class RTSPConnection {
             serverResponseTokens.nextToken();
             rtspResponseCode = Integer.parseInt(serverResponseTokens.nextToken());
 
+            playResponse = RTSPBufferedReader.readLine();
+            playResponse = RTSPBufferedReader.readLine();
+
         } catch (Exception exp) {
             System.out.println("Exception caught: " + exp);
             System.exit(0);
@@ -240,6 +249,10 @@ public class RTSPConnection {
                     elapsedTime=(double)System.currentTimeMillis()-start;
                     if(elapsedTime>2000)
                         break;
+                    if(rtpRceivedataThread.threadSuspended)
+                        synchronized(rtpRceivedataThread) {
+                            rtpRceivedataThread.wait();
+                        }
                     rtspConnection.RTPsocket.receive(rtspConnection.RTPPacket);
                     Frame frame = rtspConnection.parseRTPPacket(rtspConnection.RTPPacket);
 
@@ -284,7 +297,6 @@ public class RTSPConnection {
                     if(response.getResponseCode()==200){
                         this.state = 1;
                         System.out.println("RTSP state: READY");
-                        rtpRceivedataThread.suspend();
                         rtpRceivedataThread.threadSuspended=true;
                     }
                     else{
@@ -293,7 +305,9 @@ public class RTSPConnection {
 
                 } catch (IOException e) {
                     e.printStackTrace();
-                }
+                }/*catch (InterruptedException e) {
+                    e.printStackTrace();
+                }*/
             }
         }
     private int sendPauseRequest() {
@@ -395,15 +409,19 @@ public class RTSPConnection {
             StringTokenizer serverResponseTokens = new StringTokenizer(serverResponse);
             String rtspVersion = serverResponseTokens.nextToken();
             int rtspResponseCode = Integer.parseInt(serverResponseTokens.nextToken());
-            String rtspMessageCode = serverResponseTokens.nextToken();
+            String rtspMessageCode=new String("");
+            if(serverResponseTokens.hasMoreElements())
+                rtspMessageCode= serverResponseTokens.nextToken();
 
             rtspResponse= new RTSPResponse(rtspVersion,rtspResponseCode,rtspMessageCode);
-
+            String headerName="",Value="";
             do {
                 serverResponse = RTSPBufferedReader.readLine();
                 serverResponseTokens = new StringTokenizer(serverResponse);
-                String headerName = serverResponseTokens.nextToken();
-                String Value      = serverResponseTokens.nextToken();
+                if(serverResponseTokens.hasMoreElements())
+                     headerName = serverResponseTokens.nextToken();
+                if(serverResponseTokens.hasMoreElements())
+                     Value      = serverResponseTokens.nextToken();
                 rtspResponse.addHeaderValue(headerName,Value);
             } while (serverResponse.compareTo("") != 0);
 
