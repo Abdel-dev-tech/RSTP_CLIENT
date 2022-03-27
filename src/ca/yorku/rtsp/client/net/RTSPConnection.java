@@ -59,7 +59,6 @@ public class RTSPConnection {
      *                       or there is no connectivity.
      */
     public RTSPConnection(Session session, String server, int port) throws RTSPException {
-        this.rtpRceivedataThread = new RTPReceivingThread(this);
         this.session = session;
         this.state = 0;
         this.rtpBuffer = new byte[15000];
@@ -67,7 +66,7 @@ public class RTSPConnection {
         try {
 
             this.RTPsocket = new DatagramSocket(this.RTP_PORT);
-            this.RTPsocket.setSoTimeout(5);
+            this.RTPsocket.setSoTimeout(100);
 
             ServerIPAddr = InetAddress.getByName(server);
             RTSPsocket = new Socket(ServerIPAddr, port);
@@ -101,7 +100,7 @@ public class RTSPConnection {
      */
     public synchronized void setup(String videoName) throws RTSPException {
 
-        // TODO
+        this.rtpRceivedataThread = new RTPReceivingThread(this);
         this.videoName = videoName;
         System.out.println("Setup Button pressed !");
         int rtspResponseCode;
@@ -259,7 +258,6 @@ public class RTSPConnection {
                     System.out.println("Packet Received");
                     /* called with the resulting packet */
                     session.processReceivedFrame(frame);
-                    this.sleep(20);
                     start=(double)System.currentTimeMillis();
 
                     } catch (InterruptedIOException exception) {
@@ -340,8 +338,48 @@ public class RTSPConnection {
         public synchronized void teardown() throws RTSPException {
 
             // TODO
+            System.out.println("Teardown Button pressed !");
+            this.RTSPSeqNb++;
+            sendTearDownRequest();
+
+            /*Get Pause response*/
+            RTSPResponse response = null;
+            try {
+                response = readRTSPResponse();
+                if(response.getResponseCode()==200){
+                    this.state = 0;
+                    System.out.println("RTSP state: INIT");
+                    rtpRceivedataThread.threadSuspended=false;
+
+                }
+                else{
+                    System.out.println("Invalid Server TEARDOWN Response");
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+
+
         }
 
+    private void sendTearDownRequest() {
+
+        try {
+            /* Create a socket that will be used for RTP receive traffic*/
+
+            RTSPBufferedWriter.write("TEARDOWN " + this.videoName + " RTSP/1.0\r\n");
+            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
+            RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
+            RTSPBufferedWriter.flush();
+
+        } catch (Exception exp) {
+            System.out.println("Exception caught: " + exp);
+            System.exit(0);
+        }
+    }
         /**
          * Closes the connection with the RTSP server. This method should also close any open resource associated to this
          * connection, such as the RTP connection, if it is still open.
