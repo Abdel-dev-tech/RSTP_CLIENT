@@ -156,23 +156,6 @@ public class RTSPConnection {
     }
 
 
-    private void sendRtspRequest(String request) {
-        try {
-            RTSPBufferedWriter.write(request + " " + this.videoName + " RTSP/1.0\r\n");
-            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
-            if(request.compareTo("SETUP")!=0)
-                RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
-            else
-                RTSPBufferedWriter.write("Transport: RTP/UDP;client_port=" + RTP_PORT + "\r\n\r\n");
-
-            RTSPBufferedWriter.flush();
-        } catch (Exception exp) {
-            System.out.println("Exception caught: " + exp);
-            System.exit(0);
-        }
-    }
-
-
     private class RTPReceivingThread extends Thread {
         /**
          * Continuously receives RTP packets until the thread is cancelled. Each packet received from the datagram
@@ -380,4 +363,29 @@ public class RTSPConnection {
             } while (serverResponse.compareTo("") != 0);
             return rtspResponse;
         }
+
+
+    /**
+     * Send RTSP requests to the server
+     *
+     * @param request The RTSP request that will be sent to the Server
+     * @throws IOException   In case of an I/O error, such as loss of connectivity.
+     */
+    private void sendRtspRequest(String request) {
+        try {
+            RTSPBufferedWriter.write(request + " " + this.videoName + " RTSP/1.0\r\n");
+            RTSPBufferedWriter.write("CSeq: " + this.RTSPSeqNb + "\r\n");
+
+            if(request.compareTo("SETUP")==0)
+                RTSPBufferedWriter.write("Transport: RTP/UDP;client_port=" + RTP_PORT + "\r\n\r\n");
+            else
+                RTSPBufferedWriter.write("Session: " + this.rtspSessionId + "\r\n\r\n");
+
+            RTSPBufferedWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
+
+}
